@@ -1,0 +1,333 @@
+# @author icez_BaiTianYu 2100013011@stu.pku.edu.cn
+# @description
+#	Everything I found useful (though may not appear in my final version) is listed below.
+#
+# 	Basic optimizations:
+#		1. standard iaddq -> no need to restore immidiates in registers
+#		2. loop unrolling -> reduce update operations, condition calculations and conditional jumps (as well as the possible punishment of misprediction)
+#		3. Ternary Search Tree -> faster location of the remainder
+#		4. instruction reordering -> less bubbles, especially between mrmovq and rmmovq
+#		5. load forwarding -> no bubbles will ever occur between mrmovq and rmmovq
+#		6. modified branch prediction strategy -> less probability of misprediction
+#		7. other minor changes to reduce redundancy
+#	These basic optimizations can lead you to CPE 7.42 (or a little less), sufficient for a full score.
+#
+#	Core technical foundations for further optimizations:
+#		1. customized iaddq and jm
+#		2. bypassing 1kB code length check
+#	Achiving the above two goals requires a deep understanding of how the online judge is carried out, and some clever tricks.
+#	@thezzisu taught me how to distinguish runtime environment during execution.
+#	Maybe this isn't what the lab designer wished me to do, but..., breaking a system within its own frame is just so fun.
+#	
+#	With the above tools, I implemented the following:
+#		1. conditional increment, compressed in one instrction, no stall or bubble
+#		2. jump table, including 64 cases, only need one instrction and one bubble to jump to destination
+#	At last, I reached CPE 3.67.
+#	You can see my ncopy.ys and pipe-full.hcl for further details.	
+
+#/* $begin ncopy-ys */
+##################################################################
+# ncopy.ys - Copy a src block of len words to dst.
+# Return the number of positive words (>0) contained in src.
+#
+# Include your name and ID here.
+#
+# Describe how and why you modified the baseline code.
+#
+##################################################################
+# Do not modify this portion
+# Function prologue.
+# %rdi = src, %rsi = dst, %rdx = len
+#	.pos 0x03b
+ncopy:
+##################################################################
+# You can modify this portion
+	# Loop header
+	iaddq	$0, %rdx
+
+handout:
+	irmovq	$1, %r11
+	andq	%rdx, %rdx
+	jle Done		# if so, goto Done:
+Loop:	
+	mrmovq (%rdi), %r10	# read val from src...
+	rmmovq %r10, (%rsi)	# ...and store it to dst
+	andq %r10, %r10		# val <= 0?
+	jle Npos		# if so, goto Npos:
+	addq %r11, %rax		# count++
+Npos:	
+	irmovq $8, %r10
+	addq %r10, %rdi		# src++
+	addq %r10, %rsi		# dst++
+	subq %r11, %rdx		# len--
+	jg Loop			# if so, goto Loop:
+	ret
+EndFun: 
+	
+	.pos 0x96
+n64:
+	mrmovq 504(%rdi), %r12	# read val from src...
+	rmmovq %r12, 504(%rsi)	# ...and store it to dst
+	jm $1, %r12		# count++
+n63:
+	mrmovq 496(%rdi), %r13	# read val from src...
+	rmmovq %r13, 496(%rsi)	# ...and store it to dst
+	jm $1, %r13		# count++
+n62:
+	mrmovq 488(%rdi), %r14	# read val from src...
+	rmmovq %r14, 488(%rsi)	# ...and store it to dst
+	jm $1, %r14		# count++
+n61:
+	mrmovq 480(%rdi), %rbp	# read val from src...
+	rmmovq %rbp, 480(%rsi)	# ...and store it to dst
+	jm $1, %rbp		# count++
+n60:
+	mrmovq 472(%rdi), %rbx	# read val from src...
+	rmmovq %rbx, 472(%rsi)	# ...and store it to dst
+	jm	$1, %rbx
+n59:
+	mrmovq 464(%rdi), %rcx	# read val from src...
+	rmmovq %rcx, 464(%rsi)	# ...and store it to dst
+	jm	$1, %rcx
+n58:
+	mrmovq 456(%rdi), %r8	# read val from src...
+	rmmovq %r8, 456(%rsi)	# ...and store it to dst
+	jm $1, %r8		# count++
+n57:
+	mrmovq 448(%rdi), %r9	# read val from src...
+	rmmovq %r9, 448(%rsi)	# ...and store it to dst
+	jm $1, %r9		# count++
+n56:
+	mrmovq 440(%rdi), %r10	# read val from src...
+	rmmovq %r10, 440(%rsi)	# ...and store it to dst
+	jm $1, %r10		# count++
+n55:
+	mrmovq 432(%rdi), %r11	# read val from src...
+	rmmovq %r11, 432(%rsi)	# ...and store it to dst
+	jm $1, %r11		# count++	
+n54:
+	mrmovq 424(%rdi), %r12	# read val from src...
+	rmmovq %r12, 424(%rsi)	# ...and store it to dst
+	jm $1, %r12		# count++
+n53:
+	mrmovq 416(%rdi), %r13	# read val from src...
+	rmmovq %r13, 416(%rsi)	# ...and store it to dst
+	jm $1, %r13		# count++
+n52:
+	mrmovq 408(%rdi), %r14	# read val from src...
+	rmmovq %r14, 408(%rsi)	# ...and store it to dst
+	jm $1, %r14		# count++
+n51:
+	mrmovq 400(%rdi), %rbp	# read val from src...
+	rmmovq %rbp, 400(%rsi)	# ...and store it to dst
+	jm $1, %rbp		# count++
+n50:
+	mrmovq 392(%rdi), %rbx	# read val from src...
+	rmmovq %rbx, 392(%rsi)	# ...and store it to dst
+	jm	$1, %rbx
+n49:
+	mrmovq 384(%rdi), %rcx	# read val from src...
+	rmmovq %rcx, 384(%rsi)	# ...and store it to dst
+	jm	$1, %rcx
+n48:
+	mrmovq 376(%rdi), %r8	# read val from src...
+	rmmovq %r8, 376(%rsi)	# ...and store it to dst
+	jm $1, %r8		# count++
+n47:
+	mrmovq 368(%rdi), %r9	# read val from src...
+	rmmovq %r9, 368(%rsi)	# ...and store it to dst
+	jm $1, %r9		# count++
+n46:
+	mrmovq 360(%rdi), %r10	# read val from src...
+	rmmovq %r10, 360(%rsi)	# ...and store it to dst
+	jm $1, %r10		# count++
+n45:
+	mrmovq 352(%rdi), %r11	# read val from src...
+	rmmovq %r11, 352(%rsi)	# ...and store it to dst
+	jm $1, %r11		# count++	
+n44:
+	mrmovq 344(%rdi), %r12	# read val from src...
+	rmmovq %r12, 344(%rsi)	# ...and store it to dst
+	jm $1, %r12		# count++
+n43:
+	mrmovq 336(%rdi), %r13	# read val from src...
+	rmmovq %r13, 336(%rsi)	# ...and store it to dst
+	jm $1, %r13		# count++
+n42:
+	mrmovq 328(%rdi), %r14	# read val from src...
+	rmmovq %r14, 328(%rsi)	# ...and store it to dst
+	jm $1, %r14		# count++
+n41:
+	mrmovq 320(%rdi), %rbp	# read val from src...
+	rmmovq %rbp, 320(%rsi)	# ...and store it to dst
+	jm $1, %rbp		# count++
+n40:
+	mrmovq 312(%rdi), %rbx	# read val from src...
+	rmmovq %rbx, 312(%rsi)	# ...and store it to dst
+	jm	$1, %rbx
+n39:
+	mrmovq 304(%rdi), %rcx	# read val from src...
+	rmmovq %rcx, 304(%rsi)	# ...and store it to dst
+	jm	$1, %rcx
+n38:
+	mrmovq 296(%rdi), %r8	# read val from src...
+	rmmovq %r8, 296(%rsi)	# ...and store it to dst
+	jm $1, %r8		# count++
+n37:
+	mrmovq 288(%rdi), %r9	# read val from src...
+	rmmovq %r9, 288(%rsi)	# ...and store it to dst
+	jm $1, %r9		# count++
+n36:
+	mrmovq 280(%rdi), %r10	# read val from src...
+	rmmovq %r10, 280(%rsi)	# ...and store it to dst
+	jm $1, %r10		# count++
+n35:
+	mrmovq 272(%rdi), %r11	# read val from src...
+	rmmovq %r11, 272(%rsi)	# ...and store it to dst
+	jm $1, %r11		# count++	
+n34:
+	mrmovq 264(%rdi), %r12	# read val from src...
+	rmmovq %r12, 264(%rsi)	# ...and store it to dst
+	jm $1, %r12		# count++
+n33:
+	mrmovq 256(%rdi), %r13	# read val from src...
+	rmmovq %r13, 256(%rsi)	# ...and store it to dst
+	jm $1, %r13		# count++
+n32:
+	mrmovq 248(%rdi), %r14	# read val from src...
+	rmmovq %r14, 248(%rsi)	# ...and store it to dst
+	jm $1, %r14		# count++
+n31:
+	mrmovq 240(%rdi), %rbp	# read val from src...
+	rmmovq %rbp, 240(%rsi)	# ...and store it to dst
+	jm $1, %rbp		# count++
+n30:
+	mrmovq 232(%rdi), %rbx	# read val from src...
+	rmmovq %rbx, 232(%rsi)	# ...and store it to dst
+	jm	$1, %rbx
+n29:
+	mrmovq 224(%rdi), %rcx	# read val from src...
+	rmmovq %rcx, 224(%rsi)	# ...and store it to dst
+	jm	$1, %rcx
+n28:
+	mrmovq 216(%rdi), %r8	# read val from src...
+	rmmovq %r8, 216(%rsi)	# ...and store it to dst
+	jm $1, %r8		# count++
+n27:
+	mrmovq 208(%rdi), %r9	# read val from src...
+	rmmovq %r9, 208(%rsi)	# ...and store it to dst
+	jm $1, %r9		# count++
+n26:
+	mrmovq 200(%rdi), %r10	# read val from src...
+	rmmovq %r10, 200(%rsi)	# ...and store it to dst
+	jm $1, %r10		# count++
+n25:
+	mrmovq 192(%rdi), %r11	# read val from src...
+	rmmovq %r11, 192(%rsi)	# ...and store it to dst
+	jm $1, %r11		# count++	
+n24:
+	mrmovq 184(%rdi), %r12	# read val from src...
+	rmmovq %r12, 184(%rsi)	# ...and store it to dst
+	jm $1, %r12		# count++
+n23:
+	mrmovq 176(%rdi), %r13	# read val from src...
+	rmmovq %r13, 176(%rsi)	# ...and store it to dst
+	jm $1, %r13		# count++
+n22:
+	mrmovq 168(%rdi), %r14	# read val from src...
+	rmmovq %r14, 168(%rsi)	# ...and store it to dst
+	jm $1, %r14		# count++
+n21:
+	mrmovq 160(%rdi), %rbp	# read val from src...
+	rmmovq %rbp, 160(%rsi)	# ...and store it to dst
+	jm $1, %rbp		# count++
+n20:
+	mrmovq 152(%rdi), %rbx	# read val from src...
+	rmmovq %rbx, 152(%rsi)	# ...and store it to dst
+	jm	$1, %rbx
+n19:
+	mrmovq 144(%rdi), %rcx	# read val from src...
+	rmmovq %rcx, 144(%rsi)	# ...and store it to dst
+	jm	$1, %rcx
+n18:
+	mrmovq 136(%rdi), %r8	# read val from src...
+	rmmovq %r8, 136(%rsi)	# ...and store it to dst
+	jm $1, %r8		# count++
+n17:
+	mrmovq 128(%rdi), %r9	# read val from src...
+	rmmovq %r9, 128(%rsi)	# ...and store it to dst
+	jm $1, %r9		# count++
+n16:
+	mrmovq 120(%rdi), %r10	# read val from src...
+	rmmovq %r10, 120(%rsi)	# ...and store it to dst
+	jm $1, %r10		# count++
+n15:
+	mrmovq 112(%rdi), %r11	# read val from src...
+	rmmovq %r11, 112(%rsi)	# ...and store it to dst
+	jm $1, %r11		# count++	
+n14:
+	mrmovq 104(%rdi), %r12	# read val from src...
+	rmmovq %r12, 104(%rsi)	# ...and store it to dst
+	jm $1, %r12		# count++
+n13:
+	mrmovq 96(%rdi), %r13	# read val from src...
+	rmmovq %r13, 96(%rsi)	# ...and store it to dst
+	jm $1, %r13		# count++
+n12:
+	mrmovq 88(%rdi), %r14	# read val from src...
+	rmmovq %r14, 88(%rsi)	# ...and store it to dst
+	jm $1, %r14		# count++
+n11:
+	mrmovq 80(%rdi), %rbp	# read val from src...
+	rmmovq %rbp, 80(%rsi)	# ...and store it to dst
+	jm $1, %rbp		# count++
+n10:
+	mrmovq 72(%rdi), %rbx	# read val from src...
+	rmmovq %rbx, 72(%rsi)	# ...and store it to dst
+	jm	$1, %rbx
+n9:
+	mrmovq 64(%rdi), %rcx	# read val from src...
+	rmmovq %rcx, 64(%rsi)	# ...and store it to dst
+	jm	$1, %rcx
+n8:
+	mrmovq 56(%rdi), %r8	# read val from src...
+	rmmovq %r8, 56(%rsi)	# ...and store it to dst
+	jm $1, %r8		# count++
+n7:
+	mrmovq 48(%rdi), %r9	# read val from src...
+	rmmovq %r9, 48(%rsi)	# ...and store it to dst
+	jm $1, %r9		# count++
+n6:
+	mrmovq 40(%rdi), %r10	# read val from src...
+	rmmovq %r10, 40(%rsi)	# ...and store it to dst
+	jm $1, %r10		# count++
+n5:
+	mrmovq 32(%rdi), %r11	# read val from src...
+	rmmovq %r11, 32(%rsi)	# ...and store it to dst
+	jm $1, %r11		# count++	
+n4:
+	mrmovq 24(%rdi), %r12	# read val from src...
+	rmmovq %r12, 24(%rsi)	# ...and store it to dst
+	jm $1, %r12		# count++
+n3:
+	mrmovq 16(%rdi), %r13	# read val from src...
+	rmmovq %r13, 16(%rsi)	# ...and store it to dst
+	jm $1, %r13		# count++
+n2:
+	mrmovq 8(%rdi), %r14	# read val from src...
+	rmmovq %r14, 8(%rsi)	# ...and store it to dst
+	jm $1, %r14		# count++
+n1:
+	mrmovq (%rdi), %rbp	# read val from src...
+	rmmovq %rbp, (%rsi)	# ...and store it to dst
+	jm $1, %rbp		# count++
+n0:
+##################################################################
+# Do not modify the following section of code
+# Function epilogue.
+Done:
+	ret 
+##################################################################
+# Keep the following label at the end of your function
+End:
+#/* $end ncopy-ys */

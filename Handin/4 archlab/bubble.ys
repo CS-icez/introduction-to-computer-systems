@@ -1,0 +1,58 @@
+# 2100013011@stu.pku.edu.cn
+# icez_BaiTianYu
+    .pos 0
+    irmovq stack, %rsp
+    call main
+    halt
+
+    .align 8
+Array:
+.quad 0xbca
+.quad 0xcba
+.quad 0xacb
+.quad 0xcab
+.quad 0xabc
+.quad 0xbac
+
+main:
+    irmovq  Array, %rdi
+    irmovq  $6, %rsi
+    call bubble_sort
+    ret
+
+bubble_sort:
+    irmovq  $1, %r8
+    subq    %r8, %rsi
+    irmovq  $8, %r8
+    addq    %rsi, %rsi
+    addq    %rsi, %rsi
+    addq    %rsi, %rsi
+    addq    %rdi, %rsi
+    jmp     test1
+loop1:
+    rrmovq  %rdi, %rdx
+    jmp test2
+loop2:
+    mrmovq  8(%rdx), %r10
+    mrmovq  (%rdx), %r9
+    rrmovq  %r9, %r11
+    subq    %r10, %r11
+    cmovg   %r10, %rcx
+    cmovg   %r9, %r10
+    cmovg   %rcx, %r9
+    rmmovq  %r10, 8(%rdx)
+    rmmovq  %r9, (%rdx)
+    addq    %r8, %rdx
+test2:
+    rrmovq  %rsi, %rcx
+    subq    %rdx, %rcx
+    jg loop2
+    subq    %r8, %rsi
+test1:
+    rrmovq  %rsi, %rcx
+    subq    %rdi, %rcx
+    jg     loop1
+    ret
+
+    .pos 0x200
+stack:
